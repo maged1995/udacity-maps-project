@@ -94,17 +94,17 @@
   </head>
   <body>
     <nav class="navbar">
-      <span class="san" style="font-size:30px;cursor:pointer" onclick="openNav()" data-bind="click: filter">&#9776;</span>
+      <span class="san" style="font-size:30px;cursor:pointer" onclick="openNav()">&#9776;</span>
     </nav>
     <div class="cont">
       <div id="options-box" style="width: 0px; position:absolute;">
         <h1>Find Your New Cairo Home</h1>
         <div id="filter" data-bind="with: filterer">
-          <input id="places-search" data-bind="textInput: str, event: {input: filter}" type="text" placeholder="Ex: Loft">
+          <input id="places-search"  data-bind="textInput: str, event: {input: filter}, afterRender: filter" type="text" placeholder="Ex: Loft">
           <div id="list-result">
-            <ul class="navbar-nav" data-bind="foreach: res">
+            <ul class="navbar-nav" data-bind="foreach: {data: res, as: 'result'}">
               <li class="nav-item" >
-                <!-- <button class="nav-link btn btn-link" data-bind="attr: {title: marker().title}" onclick="popLWInfo(id)"></button> -->
+                <button class="nav-link btn btn-link" data-bind="text: marker().title,click: popLWInfo" ></button>
               </li>
             </ul>
           </div>
@@ -139,7 +139,9 @@
         if(document.getElementById("options-box").style.width=="0px"){
           document.getElementById("options-box").style.width = "340px";
           document.getElementById("options-box").style.visibility = "visible";
-          document.getElementById("places-search").focus();
+          document.getElementById("options-box").focus();
+          // this function is called in order to show the result without before input
+          window.filter();
         }
         else{
           document.getElementById("options-box").style.width = "0px";
@@ -258,14 +260,33 @@
             icon: defaultIcon,
             id: i
           });
-          marker.addListener('click', function() {
-            populateInfoWindow(this, largeInfowindow);
+          // marker.addListener('click', function() {
+          //   populateInfoWindow(this, largeInfowindow);
+          //   this.setIcon(highlightedIcon);
+          // });
+
+          var curMarker;
+          google.maps.event.addListener(marker, 'click', function () {
+            if(curMarker){
+              curMarker.setIcon(defaultIcon);
+            }
+            largeInfowindow.open(map, this);
+            this.setIcon(highlightedIcon);
+            curMarker = this;
+            populateInfoWindow(curMarker, largeInfowindow);
           });
+
           marker.addListener('mouseover', function() {
             this.setIcon(highlightedIcon);
           });
           marker.addListener('mouseout', function() {
-            this.setIcon(defaultIcon);
+            if(!largeInfowindow.marker){
+              this.setIcon(defaultIcon);
+            }
+          });
+          google.maps.event.addListener(largeInfowindow,'closeclick',function(){
+             curMarker.setIcon(defaultIcon); //removes the marker
+             // then, remove the infowindows name from the array
           });
           markers.push(marker);
         }
@@ -313,6 +334,9 @@
             createMarkersForPlaces(places);
           }
         }
+        function precise(x) {
+          return Number.parseFloat(x).toPrecision(4);
+        }
         function populateInfoWindow(marker, infowindow) {
           if (infowindow.marker != marker) {
             infowindow.setContent('');
@@ -327,7 +351,8 @@
                 var nearStreetViewLocation = data.location.latLng;
                 var heading = google.maps.geometry.spherical.computeHeading(
                   nearStreetViewLocation, marker.position);
-                  infowindow.setContent('<div>' + marker.title + '</div><div id="pano"></div>');
+
+                  infowindow.setContent('<div>' + marker.title + '</div><div id="flic"></div><div id="pano"></div>');
                   var panoramaOptions = {
                     position: nearStreetViewLocation,
                     pov: {
@@ -338,9 +363,17 @@
                 var panorama = new google.maps.StreetViewPanorama(
                   document.getElementById('pano'), panoramaOptions);
               } else {
-                infowindow.setContent('<div>' + marker.title + '</div>' +
+                infowindow.setContent('<div>' + marker.title + '</div><div id="flic"></div>' +
                   '<div>No Street View Found</div>');
               }
+
+              // here's the api of flickr to find out how many photos take at this area
+              var url = "https://api.flickr.com/services/rest/?method=flickr.photos.search&api_key=f2a8d2fc6299aec182be29ec02b4d54b&lat="+marker.position.lat()+"&lon="+marker.position.lng()+"&radius=1&format=json&nojsoncallback=1";
+              $.getJSON(url, function(data1) {
+                $("#flic").append(data1.photos.total+" photos take around here");
+              });
+
+
             }
             streetViewService.getPanoramaByLocation(marker.position, radius, getStreetView);
             infowindow.open(map, marker);
@@ -382,10 +415,12 @@
               if (place.name) {
                 innerHTML += '<strong>' + place.name + '</strong>';
               }
-              if (place.photos) {
-                innerHTML += '<br><br><img src="' + place.photos[0].getUrl(
-                    {maxHeight: 100, maxWidth: 200}) + '">';
-              }
+              var url = "https://api.foursquare.com/v2/venues/search?ll="+place.position.lat+","+place.position.lng;
+
+              // if (place.photos) {
+              //   innerHTML += '<br><br><img src="' + place.photos[0].getUrl(
+              //       {maxHeight: 100, maxWidth: 200}) + '">';
+              // }
               innerHTML += '</div>';
               infowindow.setContent(innerHTML);
               infowindow.open(map, marker);
@@ -411,74 +446,60 @@
         bounds.extend(marker.position);
       }
 
-
-      // this is the filter function
-      function filter(str){
-        var bounds = new google.maps.LatLngBounds();
-        hideMarkers();
-        // list-result is where the result of the filter will be displayed
-        document.getElementById("list-result").innerHTML  = "";
-        var r = "<ul class='navbar-nav'>";
-        // i will have to iterate through the l list to list all the marker locations on the options-box
-        for(var i = 0; i < l.length; i++){
-          // since the l list and the marker list's indeces referce are the same
-          // i put the i for iterattion into popLWInfo() the parameter
-          if(l[i].toLowerCase().includes(str.toLowerCase())){
-            markers[i].setMap(map);
-            bounds.extend(markers[i].position);
-            r += "<li class='nav-item'>"+
-            "<button class='nav-link btn btn-link' onclick='popLWInfo("+i+")'>"+
-            l[i]+
-            "</button>"+
-            "</li>";
-          }
-        }
-        r+="</ul>";
-        document.getElementById("list-result").innerHTML = r;
+      function httpGet(theUrl)
+      {
+          var xmlHttp = new XMLHttpRequest();
+          xmlHttp.open( "GET", theUrl, false ); // false for synchronous request
+          xmlHttp.send( null );
+          return xmlHttp.responseText;
       }
     </script>
 
-    <script async defer
-        src=
-        "https://maps.googleapis.com/maps/api/js?libraries=places,geometry,drawing&key=AIzaSyDVOJqxHRaTVrkjYg_DG7v-RvoxqrzYP6g&v=3&callback=initMap">
-    </script>
-
     <script type="text/javascript">
+    // this is the model
     var locat = function(data){
       this.id = ko.observable(data.id);
       this.marker = ko.observable(data.marker);
+
     };
+
+    // this is the viewModel
     function filterer(){
       var self = this;
       self.str = ko.observable("");
       self.res = ko.observableArray();
+      // this is the function that filters throught the list
       self.filter = function(){
-        self.res = ko.observableArray([]);
+        self.res([]);
         hideMarkers();
-        console.log("in");
         var r = [];
         for(var i = 0; i < markers.length; i++){
           var li = markers[i].title.toLowerCase();
           var s = self.str();
           if(li.includes(s.toLowerCase())){
-            console.log("inn");
             self.res.push(new locat({id: i, marker: markers[i]}));
             markers[i].setMap(map);
             setBounds(markers[i]);
           }
         }
-        self.res.valueHasMutated();
-
         console.log(self);
-        return self;
       }.bind(self);
-      self.popLWInfo = function(i){
-        google.maps.event.trigger(markers[i], "click", {});
+      // this is the function that shows large information window
+      self.popLWInfo = function(loc){
+        google.maps.event.trigger(markers[loc.id()], "click", {});
         openNav();
+        hideMarkers();
+        markers[loc.id()].setMap(map);
+        setBounds(markers[loc.id()]);
       };
     };
-    // var filt = new filterer();
-    ko.applyBindings(new filterer());
+    ko.applyBindings(new filterer);
+    </script>
+
+    <!-- replace [YOUR_KEY] with your API key -->
+    <script async defer
+        src=
+        "https://maps.googleapis.com/maps/api/js?libraries=places,geometry,drawing&key=AIzaSyDVOJqxHRaTVrkjYg_DG7v-RvoxqrzYP6g&v=3&callback=initMap">
     </script>
   </body>
 </html>
