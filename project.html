@@ -1,0 +1,288 @@
+<!doctype html>
+<html>
+ <head>
+   <meta name="viewport" content="width=device-width,initial-scale=1">
+   <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.1.0/css/bootstrap.min.css">
+   <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+   <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.1.3/js/bootstrap.min.js"></script>
+   <style type="text/css">
+   html, body{
+     font-family: Arial, sans-serif;
+     height: 100%;
+     margin: 0;
+     padding-bottom: 1px;
+
+   }
+   .cont {
+     height: 90%;
+     position: relative;
+   }
+   .navbar{height:10%;}
+   input {font-size: 12px;}
+   h1 {
+     color: #525454;
+     font-size: 22px;
+     margin: 0 0 10px 0;
+     text-align: center;
+   }
+   #map {
+     z-index: 0;
+     bottom:0px;
+     height: 100%;
+     width: 100%;
+     left: 0px;
+     position: absolute;
+     display: flex;
+     right: 0px;
+     text-align: left;
+     clear: both;
+   }
+   #options-box {
+     background: #fff;
+     border: 1px solid #999;
+     border-radius: 3px;
+     height: 100%;
+     line-height: 35px;
+     padding: 10px 10px 30px 10px;
+     text-align: left;
+     visibility: collapse;
+     position: absolute;
+     z-index: 1;
+   }
+   #filter{width: 100%;}
+   #places-search{width: 100%;}
+   #pano {
+     width: 200px;
+     height: 200px;
+   }
+   </style>
+   <script type="text/javascript" src="knockout-3.4.2.js"></script>
+ </head>
+ <body>
+   <nav class="navbar">
+     <span class="san" style="font-size:30px;cursor:pointer" onclick="openNav()">&#9776;</span>
+   </nav>
+   <div class="cont">
+     <div id="options-box" style="width: 0px; position:absolute;">
+       <h1>Find Your New NYC Home</h1>
+       <div id="filter" data-bind="with: filterer">
+         <input id="places-search"  data-bind="textInput: str, event: {input: filter}, afterRender: filter" type="text" placeholder="Ex: Loft">
+         <div id="list-result">
+           <ul class="navbar-nav" data-bind="foreach: {data: res, as: 'result'}">
+             <li class="nav-item" >
+               <button class="nav-link btn btn-link" data-bind="text: marker().title,click: popLWInfo" ></button>
+             </li>
+           </ul>
+         </div>
+       </div>
+     </div>
+     <div id="map">
+     </div>
+   </div>
+   <script type="text/javascript">
+   $(document).ready(function(){
+       resizeDiv();
+     });
+     // this function triggers when i click on one of the results on the list
+     function popLWInfo(i){
+       google.maps.event.trigger(markers[i], "click", {});
+       openNav();
+     }
+
+     window.onresize = function(event) {
+       resizeDiv();
+     };
+
+     function resizeDiv() {
+       vpw = $(window).width();
+       vph = $(window).height()*90/100;
+       $("#map").css({"height": vph + "px"});
+     }
+     function openNav() {
+       if(document.getElementById("options-box").style.width=="0px"){
+         document.getElementById("options-box").style.width = "340px";
+         document.getElementById("options-box").style.visibility = "visible";
+         document.getElementById("options-box").focus();
+         // this function is called in order to show the result without before input
+         window.filter();
+       }
+       else{
+         document.getElementById("options-box").style.width = "0px";
+         document.getElementById("options-box").style.visibility = "collapse";
+       }
+     }
+     var map;
+     var markers = [];
+     // Function to initialize the map within the map div
+     function initMap() {
+
+       map = new google.maps.Map(document.getElementById('map'), {
+         center: {lat: 40.7413549, lng: -73.9980244},
+         zoom: 14
+       });
+       var locations = [
+         {title: 'Park Ave Penthouse', location: {lat: 40.7713024, lng: -73.9632393}},
+         {title: 'Chelsea Loft', location: {lat: 40.7444883, lng: -73.9949465}},
+         {title: 'Union Square Open Floor Plan', location: {lat: 40.7347062, lng: -73.9895759}},
+         {title: 'East Village Hip Studio', location: {lat: 40.7281777, lng: -73.984377}},
+         {title: 'TriBeCa Artsy Bachelor Pad', location: {lat: 40.7195264, lng: -74.0089934}},
+         {title: 'Chinatown Homey Space', location: {lat: 40.7180628, lng: -73.9961237}}
+       ];
+       var largeInfowindow = new google.maps.InfoWindow();
+       var defaultIcon = makeMarkerIcon('0091ff');
+       var highlightedIcon = makeMarkerIcon('FFFF24');
+       for(var i = 0; i < locations.length; i++){
+         var position = locations[i].location;
+         var title = locations[i].title;
+         var marker = new google.maps.Marker({
+           position: position,
+           title: title,
+           animation: google.maps.Animation.DROP,
+           icon: defaultIcon,
+           id: i
+         });
+
+         var curentMarker;
+         google.maps.event.addListener(marker, 'click', function () {
+           if(curentMarker){
+             curentMarker.setIcon(defaultIcon);
+           }
+           largeInfowindow.open(map, this);
+           this.setIcon(highlightedIcon);
+           curentMarker = this;
+           populateInfoWindow(curentMarker, largeInfowindow);
+         });
+
+         marker.addListener('mouseover', function() {
+           this.setIcon(highlightedIcon);
+         });
+         marker.addListener('mouseout', function() {
+           if(!largeInfowindow.marker){
+             this.setIcon(defaultIcon);
+           }
+         });
+         google.maps.event.addListener(largeInfowindow,'closeclick',function(){
+            curentMarker.setIcon(defaultIcon); //removes the marker
+            // then, remove the infowindows name from the array
+         });
+         markers.push(marker);
+         marker.setMap(map);
+       }
+       function populateInfoWindow(marker, infowindow) {
+         if (infowindow.marker != marker) {
+           infowindow.marker = marker;
+           infowindow.setContent('');
+           infowindow.open(map, marker);
+           infowindow.addListener('closeclick', function() {
+             infowindow.marker = null;
+           });
+           var streetViewService = new google.maps.StreetViewService();
+           var radius = 50;
+           function getStreetView(data, status) {
+             if (status == google.maps.StreetViewStatus.OK) {
+               var nearStreetViewLocation = data.location.latLng;
+               var heading = google.maps.geometry.spherical.computeHeading(
+                 nearStreetViewLocation, marker.position);
+
+                 infowindow.setContent('<div>' + marker.title + '</div><div id="flic"></div><div id="pano"></div>');
+                 var panoramaOptions = {
+                   position: nearStreetViewLocation,
+                   pov: {
+                     heading: heading,
+                     pitch: 30
+                   }
+                 };
+               var panorama = new google.maps.StreetViewPanorama(
+                 document.getElementById('pano'), panoramaOptions);
+             } else {
+               infowindow.setContent('<div>' + marker.title + '</div><div id="flic"></div>' +
+                 '<div>No Street View Found</div>');
+             }
+
+             // here's the api of flickr to find out how many photos take at this area
+             var url = "https://api.flickr.com/services/rest/?method=flickr.photos.search&api_key=f2a8d2fc6299aec182be29ec02b4d54b&lat="+marker.position.lat()+"&lon="+marker.position.lng()+"&radius=1&format=json&nojsoncallback=1";
+             $.getJSON(url, function(data1) {
+               $("#flic").append(data1.photos.total+" photos take around here");
+             });
+
+
+           }
+           streetViewService.getPanoramaByLocation(marker.position, radius, getStreetView);
+           infowindow.open(map, marker);
+         }
+       }
+
+     }
+     function showListings() {
+        var bounds = new google.maps.LatLngBounds();
+        for (var i = 0; i < markers.length; i++) {
+          markers[i].setMap(map);
+          bounds.extend(markers[i].position);
+        }
+        map.fitBounds(bounds);
+      }
+      function makeMarkerIcon(markerColor) {
+        var markerImage = new google.maps.MarkerImage(
+          'http://chart.googleapis.com/chart?chst=d_map_spin&chld=1.15|0|'+ markerColor +
+          '|40|_|%E2%80%A2',
+          new google.maps.Size(21, 34),
+          new google.maps.Point(0, 0),
+          new google.maps.Point(10, 34),
+          new google.maps.Size(21,34));
+        return markerImage;
+      }
+      function hideMarkers() {
+        for (var i = 0; i < markers.length; i++) {
+          markers[i].setMap(null);
+        }
+      }
+
+      function setBounds(marker){
+      var bounds = new google.maps.LatLngBounds();
+        bounds.extend(marker.position);
+      }
+   </script>
+   <!--replace your API with <YOURAPI> -->
+   <script async defer
+     src="https://maps.googleapis.com/maps/api/js?v=3&key=<YOURKEY>&callback=initMap">
+   </script>
+   <script>
+   var locat = function(data){
+     this.id = ko.observable(data.id);
+     this.marker = ko.observable(data.marker);
+
+   };
+
+   // this is the viewModel
+   function filterer(){
+     var self = this;
+     self.str = ko.observable("");
+     self.res = ko.observableArray();
+     // this is the function that filters throught the list
+     self.filter = function(){
+       self.res([]);
+       hideMarkers();
+       var r = [];
+       for(var i = 0; i < markers.length; i++){
+         var li = markers[i].title.toLowerCase();
+         var s = self.str();
+         if(li.includes(s.toLowerCase())){
+           self.res.push(new locat({id: i, marker: markers[i]}));
+           markers[i].setMap(map);
+           setBounds(markers[i]);
+         }
+       }
+     }.bind(self);
+     // this is the function that shows large information window
+     self.popLWInfo = function(loc){
+       google.maps.event.trigger(markers[loc.id()], "click", {});
+       openNav();
+       hideMarkers();
+       markers[loc.id()].setMap(map);
+       setBounds(markers[loc.id()]);
+     };
+   };
+   ko.applyBindings(new filterer);
+   </script>
+ </body>
+</html>
