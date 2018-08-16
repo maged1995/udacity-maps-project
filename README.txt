@@ -19,6 +19,8 @@ Opening
 8- you can run the file now, but the API may take a few minutes work
 
 NB: if the page throws "Oops! Something went wrong. This page didn't load Google Maps correctly. See the JavaScript console for technical details." that means that the API hasn't worked yet and you have to wait for google to apply the API settings after saved, which may take up to 5 minutes
+    And the project will throw "you have exceeded you request" error and the page will shade with "development purposes only" at the second time you load project.html because of a certain billing policy 
+
 
 Neighborhood map can be reached at:
 
