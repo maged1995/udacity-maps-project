@@ -60,17 +60,17 @@
  </head>
  <body>
    <nav class="navbar">
-     <span class="san" style="font-size:30px;cursor:pointer" onclick="openNav()">&#9776;</span>
+     <span class="san" style="font-size:30px;cursor:pointer" data-bind="click: filter" onclick="openNav()">&#9776;</span>
    </nav>
    <div class="cont">
      <div id="options-box" style="width: 0px; position:absolute;">
        <h1>Find Your New NYC Home</h1>
-       <div id="filter" data-bind="with: filterer">
-         <input id="places-search"  data-bind="textInput: str, event: {input: filter}, afterRender: filter" type="text" placeholder="Ex: Loft">
+       <div id="filter">
+         <input id="places-search"  data-bind="textInput: str, event: {input: filter}" type="text" placeholder="Ex: Loft">
          <div id="list-result">
-           <ul class="navbar-nav" data-bind="foreach: {data: res, as: 'result'}">
+           <ul class="navbar-nav" data-bind="foreach: res">
              <li class="nav-item" >
-               <button class="nav-link btn btn-link" data-bind="text: marker().title, attr:{name: marker().id}" onclick="popLWInfo(name)" ></button>
+               <button class="nav-link btn btn-link" data-bind="text: marker().title, click: $root.popLWInfo"></button>
              </li>
            </ul>
          </div>
@@ -84,13 +84,6 @@
        resizeDiv();
      });
      // this function triggers when i click on one of the results on the list
-     function popLWInfo(i){
-       google.maps.event.trigger(markers[i], "click", {});
-       openNav();
-       hideMarkers();
-       markers[i].setMap(map);
-       setBounds(markers[i]);
-     }
 
      window.onresize = function(event) {
        resizeDiv();
@@ -107,7 +100,6 @@
          document.getElementById("options-box").style.visibility = "visible";
          document.getElementById("options-box").focus();
          // this function is called in order to show the result without before input
-         window.filter();
        }
        else{
          document.getElementById("options-box").style.width = "0px";
@@ -181,32 +173,38 @@
            });
            var streetViewService = new google.maps.StreetViewService();
            var radius = 50;
+
            function getStreetView(data, status) {
-             if (status == google.maps.StreetViewStatus.OK) {
-               var nearStreetViewLocation = data.location.latLng;
-               var heading = google.maps.geometry.spherical.computeHeading(
-                 nearStreetViewLocation, marker.position);
-
-                 infowindow.setContent('<div>' + marker.title + '</div><div id="flic"></div><div id="pano"></div>');
-                 var panoramaOptions = {
-                   position: nearStreetViewLocation,
-                   pov: {
-                     heading: heading,
-                     pitch: 30
-                   }
-                 };
-               var panorama = new google.maps.StreetViewPanorama(
-                 document.getElementById('pano'), panoramaOptions);
-             } else {
-               infowindow.setContent('<div>' + marker.title + '</div><div id="flic"></div>' +
-                 '<div>No Street View Found</div>');
-             }
-
              // here's the api of flickr to find out how many photos take at this area
              var url = "https://api.flickr.com/services/rest/?method=flickr.photos.search&api_key=f2a8d2fc6299aec182be29ec02b4d54b&lat="+marker.position.lat()+"&lon="+marker.position.lng()+"&radius=1&format=json&nojsoncallback=1";
+             var FlickrData = "";
              $.getJSON(url, function(data1) {
-               $("#flic").append(data1.photos.total+" photos take around here");
-             }).fail(function() { $("#flic").append("could not get the number of photos taken"); });
+               FlickrData= data1.photos.total+" photos take around here";
+             }).fail(function() { FlickrData = "could not get the number of photos taken"; }).then(function(){
+               if (status == google.maps.StreetViewStatus.OK) {
+                 var nearStreetViewLocation = data.location.latLng;
+                 var heading = google.maps.geometry.spherical.computeHeading(
+                   nearStreetViewLocation, marker.position);
+
+                   infowindow.setContent('<div>' + marker.title + '</div><div>'+FlickrData+'</div><div id="pano"></div>');
+                   var panoramaOptions = {
+                     position: nearStreetViewLocation,
+                     pov: {
+                       heading: heading,
+                       pitch: 30
+                     }
+                   };
+                 var panorama = new google.maps.StreetViewPanorama(
+                   document.getElementById('pano'), panoramaOptions);
+               } else {
+                 infowindow.setContent('<div>' + marker.title + '</div><div>'+FlickrData+'</div>' +
+                   '<div>No Street View Found</div>');
+               }
+             });
+
+
+
+
 
 
            }
@@ -247,7 +245,7 @@
    </script>
    <!--replace your API with <YOURAPI> -->
    <script async defer
-     src="https://maps.googleapis.com/maps/api/js?v=3&key=<YOURAPI>g&callback=initMap" onerror="googleError()">
+     src="https://maps.googleapis.com/maps/api/js?v=3&key=AIzaSyDVOJqxHRaTVrkjYg_DG7v-RvoxqrzYP6g&callback=initMap" onerror="googleError()">
    </script>
    <script>
    function googleError(){
@@ -281,6 +279,13 @@
        }
      }.bind(self);
      // this is the function that shows large information window
+     self.popLWInfo = function(loc){
+       console.log(loc);
+       google.maps.event.trigger(loc.marker(), "click");
+       openNav();
+       markers[loc.id()].setMap(map);
+       setBounds(markers[loc.id()]);
+     };
    };
    ko.applyBindings(new filterer);
    </script>
