@@ -70,7 +70,7 @@
          <div id="list-result">
            <ul class="navbar-nav" data-bind="foreach: {data: res, as: 'result'}">
              <li class="nav-item" >
-               <button class="nav-link btn btn-link" data-bind="text: marker().title,click: popLWInfo" ></button>
+               <button class="nav-link btn btn-link" data-bind="text: marker().title, attr:{name: marker().id}" onclick="popLWInfo(name)" ></button>
              </li>
            </ul>
          </div>
@@ -87,6 +87,9 @@
      function popLWInfo(i){
        google.maps.event.trigger(markers[i], "click", {});
        openNav();
+       hideMarkers();
+       markers[i].setMap(map);
+       setBounds(markers[i]);
      }
 
      window.onresize = function(event) {
@@ -203,7 +206,7 @@
              var url = "https://api.flickr.com/services/rest/?method=flickr.photos.search&api_key=f2a8d2fc6299aec182be29ec02b4d54b&lat="+marker.position.lat()+"&lon="+marker.position.lng()+"&radius=1&format=json&nojsoncallback=1";
              $.getJSON(url, function(data1) {
                $("#flic").append(data1.photos.total+" photos take around here");
-             });
+             }).fail(function() { $("#flic").append("could not get the number of photos taken"); });
 
 
            }
@@ -242,11 +245,15 @@
         bounds.extend(marker.position);
       }
    </script>
-   <!--replace your API key with <YOURAPI> -->
+   <!--replace your API with <YOURAPI> -->
    <script async defer
-     src="https://maps.googleapis.com/maps/api/js?v=3&key=<YOURKEY>&callback=initMap">
+     src="https://maps.googleapis.com/maps/api/js?v=3&key=<YOURAPI>g&callback=initMap" onerror="googleError()">
    </script>
    <script>
+   function googleError(){
+     alert("could not fulfill your request");
+   }
+
    var locat = function(data){
      this.id = ko.observable(data.id);
      this.marker = ko.observable(data.marker);
@@ -274,13 +281,6 @@
        }
      }.bind(self);
      // this is the function that shows large information window
-     self.popLWInfo = function(loc){
-       google.maps.event.trigger(markers[loc.id()], "click", {});
-       openNav();
-       hideMarkers();
-       markers[loc.id()].setMap(map);
-       setBounds(markers[loc.id()]);
-     };
    };
    ko.applyBindings(new filterer);
    </script>
